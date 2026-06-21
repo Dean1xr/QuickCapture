@@ -1,0 +1,48 @@
+name: Build QuickCapture IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build archive (unsigned)
+        run: |
+          xcodebuild archive \
+            -project QuickCapture.xcodeproj \
+            -scheme QuickCapture \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/QuickCapture.xcarchive" \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Package as IPA
+        run: |
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -r "$RUNNER_TEMP/QuickCapture.xcarchive/Products/Applications/QuickCapture.app" \
+                "$RUNNER_TEMP/Payload/"
+          cd "$RUNNER_TEMP"
+          zip -r QuickCapture.ipa Payload/
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuickCapture-IPA
+          path: ${{ runner.temp }}/QuickCapture.ipa
+          retention-days: 90
